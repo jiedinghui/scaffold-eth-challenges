@@ -1,7 +1,7 @@
 import WalletConnectProvider from "@walletconnect/web3-provider";
 //import Torus from "@toruslabs/torus-embed"
 import WalletLink from "walletlink";
-import { Alert, Button, Col, Menu, Row, List, Divider } from "antd";
+import { Alert, Button, Col, Menu, Row, List, Divider, Input, Space } from "antd";
 import "antd/dist/antd.css";
 import React, { useCallback, useEffect, useState } from "react";
 import { BrowserRouter, Link, Route, Switch } from "react-router-dom";
@@ -38,7 +38,7 @@ const { ethers } = require("ethers");
 
     Support:
     https://t.me/joinchat/KByvmRe5wkR-8F_zz6AjpA
-    or DM @austingriffith on Twitter or Telegram
+    or DM @austingriffith on twitter or telegram
 
     You should get your own Infura.io ID and put it in `constants.js`
     (this is your connection to the main Ethereum network for ENS etc.)
@@ -174,6 +174,12 @@ function App(props) {
   const [injectedProvider, setInjectedProvider] = useState();
   const [address, setAddress] = useState();
 
+  // Challenge 2
+  const [stakeAmount, setStakeAmount] = useState("");
+  const onEtherChange = (event) => {
+    setStakeAmount(event.target.value);
+  }
+
   const logoutOfWeb3Modal = async () => {
     await web3Modal.clearCachedProvider();
     if (injectedProvider && injectedProvider.provider && typeof injectedProvider.provider.disconnect == "function") {
@@ -252,8 +258,8 @@ function App(props) {
   );
   if (DEBUG) console.log("💵 stakerContractBalance", stakerContractBalance);
 
-  const rewardRatePerSecond = useContractReader(readContracts, "Staker", "rewardRatePerSecond");
-  console.log("💵 Reward Rate:", rewardRatePerSecond);
+  const rewardRatePerBlock = useContractReader(readContracts, "Staker", "rewardRatePerBlock");
+  console.log("💵 Reward Rate:", rewardRatePerBlock);
 
   // ** keep track of a variable from the contract in the local React state:
   const balanceStaked = useContractReader(readContracts, "Staker", "balances", [address]);
@@ -525,8 +531,8 @@ function App(props) {
             <Divider />
 
             <div style={{ padding: 8, marginTop: 16 }}>
-              <div>Reward Rate Per Second:</div>
-              <Balance balance={rewardRatePerSecond} fontSize={64} /> ETH
+              <div>APY Per Block (second):</div>
+              <Balance balance={rewardRatePerBlock} fontSize={64} /> ETH
             </div>
 
             <Divider />
@@ -578,14 +584,18 @@ function App(props) {
             </div>
 
             <div style={{ padding: 8 }}>
+              {/* Challenge 2*/}
+              <Space>
+              <Input placeholder="Enter ETH Amount" onChange={onEtherChange} />
               <Button
                 type={balanceStaked ? "success" : "primary"}
                 onClick={() => {
-                  tx(writeContracts.Staker.stake({ value: ethers.utils.parseEther("0.5") }));
+                  tx(writeContracts.Staker.stake({ value: ethers.utils.parseEther(stakeAmount) }));
                 }}
               >
-                🥩 Stake 0.5 ether!
+                🥩 Stake {stakeAmount} ether!
               </Button>
+              </Space>
             </div>
 
             {/*

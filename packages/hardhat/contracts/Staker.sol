@@ -11,10 +11,19 @@ contract Staker {
   mapping(address => uint256) public balances;
   mapping(address => uint256) public depositTimestamps;
 
-  uint256 public constant rewardRatePerSecond = 0.1 ether;
-  uint256 public withdrawalDeadline = block.timestamp + 120 seconds;
-  uint256 public claimDeadline = block.timestamp + 240 seconds;
+  uint256 public constant rewardRatePerBlock = 0.1 ether;
+  // Set withdrawTime to 120 for 2 minutes by default
+  uint256 public withdrawTime = 120;
+  uint256 public withdrawalDeadline = block.timestamp + (withdrawTime * 1 seconds);
+  // Set claimTime to 240 for 4 minutes by default
+  uint256 public claimTime = 240;
+  uint256 public claimDeadline = block.timestamp + (claimTime * 1 seconds);
   uint256 public currentBlock = 0;
+  // Exponential money!!
+  uint256 public exponentMultiplier = 2;
+
+  // Whitelist so that only the exampleExternalContract can modify
+  address public contractWhitelist;
 
   // Events
   event Stake(address indexed sender, uint256 amount);
@@ -59,6 +68,7 @@ contract Staker {
 
   constructor(address exampleExternalContractAddress){
       exampleExternalContract = ExampleExternalContract(exampleExternalContractAddress);
+      contractWhitelist = exampleExternalContractAddress;
   }
 
   // Stake function for a user to stake ETH in our contract
@@ -75,12 +85,17 @@ contract Staker {
   function withdraw() public withdrawalDeadlineReached(true) claimDeadlineReached(false) notCompleted{
     require(balances[msg.sender] > 0, "You have no balance to withdraw!");
     uint256 individualBalance = balances[msg.sender];
-    uint256 indBalanceRewards = individualBalance + ((block.timestamp-depositTimestamps[msg.sender])*rewardRatePerSecond);
+    // get the time passed
+    uint256 rewardTime = block.timestamp-depositTimestamps[msg.sender];
+    // multiply time passed by exponent
+    uint256 rewardsMultiplied = rewardTime**exponentMultiplier;
+    // add initial balance to reward rate
+    uint256 indBalanceRewards = individualBalance + (rewardsMultiplied*rewardRatePerBlock);
     balances[msg.sender] = 0;
 
     // Transfer all ETH via call! (not transfer) cc: https://solidity-by-example.org/sending-ether
     (bool sent, bytes memory data) = msg.sender.call{value: indBalanceRewards}("");
-    require(sent, "RIP; withdrawal failed :( ");
+    require(sent, "Failed to send ETH");
   }
 
   /*
@@ -90,6 +105,26 @@ contract Staker {
   function execute() public claimDeadlineReached(true) notCompleted {
     uint256 contractBalance = address(this).balance;
     exampleExternalContract.complete{value: address(this).balance}();
+  }
+
+  // Functions added for reset:
+
+  /*
+  Reset withdrawalDeadline blocktime
+  Requires withdrawalDeadlineReached to be true
+  */
+  function resetWithdrawalDeadline(uint256 _seconds) withdrawalDeadlineReached(true) public {
+    require(msg.sender == contractWhitelist, "You are not the exampleExternalContract");
+    withdrawalDeadline = block.timestamp + (_seconds * 1 seconds);
+  }
+
+  /*
+  Reset claimDeadline blocktime
+  Requires claimDeadlineReached to be true
+  */
+  function resetClaimDeadline(uint256 _seconds) claimDeadlineReached(true) public {
+    require(msg.sender == contractWhitelist, "You are not the exampleExternalContract");
+    claimDeadline = block.timestamp + (_seconds * 1 seconds);
   }
 
   /*
@@ -102,6 +137,7 @@ contract Staker {
       return (withdrawalDeadline - block.timestamp);
     }
   }
+
 
   /*
   READ-ONLY function to calculate the time remaining before the minimum staking period has passed
@@ -130,4 +166,3 @@ contract Staker {
   }
 
 }
-
